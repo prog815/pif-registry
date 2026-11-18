@@ -356,11 +356,11 @@
     <div class="links">
       <div>
         <div class="row-label">Источник данных (машиночитаемый снимок):</div>
-        <a href="https://cbr.ru/vfs/finmarkets/files/supervision/list_pif.xlsx" target="_blank" rel="noopener">Банк России — Сведения о паевых инвестиционных фондах</a>
+        <a href="https://cbr.ru/vfs/finmarkets/files/supervision/list_pif.xlsx" target="_blank" rel="noopener">Банк России — Сведения о паевых инвестиционных фондах (Excel)</a>
       </div>
       <div>
         <div class="row-label">Первоисточники и текстовые редакции для сверки:</div>
-        <a href="https://cbr.ru/finmarket/supervision/sv_mik/inside_pif/" target="_blank" rel="noopener">Реестр ПИФ на сайте ЦБ РФ</a> ·
+        <a href="https://cbr.ru/" target="_blank" rel="noopener">Официальный сайт Банка России</a> ·
         <a href="https://github.com/prog815/pif-registry" target="_blank" rel="noopener" title="Исходный код и описание справочника">О справочнике</a>
       </div>
       <div>
@@ -695,14 +695,13 @@
       if (!fallback) continue;
 
       var id = slots[j].getAttribute('data-id');
-      var nameText = slots[j].getAttribute('data-name');
-      var url = window.location.origin + window.location.pathname + '?code=' + id;
+      var shareText = slots[j].getAttribute('data-share-text');
 
       var el = document.createElement('klassik-share');
       el.setAttribute('catalog', 'pif-registry');
       el.setAttribute('title', 'Реестр ПИФ');
-      el.setAttribute('text', nameText);
-      el.setAttribute('url', url);
+      el.setAttribute('text', shareText);
+      el.setAttribute('url', ''); // Пустой URL, так как ссылка уже в тексте второй строкой
 
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -734,13 +733,27 @@
     var statusBadge = '<span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span>';
     var typeBadge = r.fund_type ? '<span class="type-badge" title="Тип фонда">' + esc(r.fund_type) + '</span>' : '';
 
-    // Склеиваем поля для копирования
-    var copyStr = [
-      r.row_num, r.fund_type, r.status, r.full_name, r.short_name, r.category,
-      r.id, r.assignment_date, r.contract_end_date, r.formation_end_date,
-      r.sd_name, r.registrar_ogrn, r.term_basis_date, r.term_basis,
-      r.excl_date, r.excl_basis, r.merger_excl
-    ].filter(Boolean).join('; ');
+    // Формируем полный текст для "Поделиться"
+    var shareUrl = window.location.origin + window.location.pathname + '?code=' + r.id;
+    var shareTextLines = [
+      r.full_name,
+      shareUrl,
+      'Номер правил: ' + r.id
+    ];
+    if (r.fund_type) shareTextLines.push('Тип: ' + r.fund_type);
+    if (r.status) shareTextLines.push('Статус: ' + r.status);
+    if (r.category) shareTextLines.push('Категория: ' + r.category);
+    if (r.sd_name) shareTextLines.push('Спецдепозитарий: ' + r.sd_name);
+    if (r.registrar_ogrn) shareTextLines.push('ОГРН: ' + r.registrar_ogrn);
+    if (r.assignment_date) shareTextLines.push('Дата присвоения номера: ' + formatDate(r.assignment_date));
+    if (r.contract_end_date) shareTextLines.push('Договор до: ' + formatDate(r.contract_end_date));
+    if (r.formation_end_date) shareTextLines.push('Окончание формирования: ' + formatDate(r.formation_end_date));
+    if (r.term_basis) shareTextLines.push('Основание прекращения: ' + r.term_basis);
+    if (r.excl_date) shareTextLines.push('Дата исключения: ' + formatDate(r.excl_date));
+    if (r.excl_basis) shareTextLines.push('Основание исключения: ' + r.excl_basis);
+    if (r.merger_excl) shareTextLines.push('Объединение: ' + r.merger_excl);
+
+    var shareText = shareTextLines.join('\n');
 
     var details = [];
     if (r.category) details.push('<div><span class="lbl">Категория:</span> <span class="val">' + highlight(r.category, queryTokens) + '</span></div>');
@@ -758,7 +771,6 @@
     var blocksHtml = '';
     var blocksList = [];
     
-    // Если фонд прекращен, показываем этот блок
     if (r.excl_date || r.excl_basis || r.term_basis) {
         var termText = [];
         if (r.term_basis_date) termText.push('Дата основания: ' + formatDate(r.term_basis_date));
@@ -792,9 +804,8 @@
       '<div class="details-grid">' + details.join('') + '</div>' +
       blocksHtml +
       '<div class="actions">' +
-        '<button type="button" class="action-btn btn-copy-row" data-str="' + esc(copyStr) + '" title="Скопировать одной строкой" aria-label="Скопировать строку с данными">📋 строка</button>' +
-        '<div class="share-slot" data-id="' + r.id + '" data-name="' + esc(r.full_name) + '">' +
-          '<button type="button" class="action-btn btn-share-fallback" data-id="' + r.id + '" data-name="' + esc(r.full_name) + '" title="Поделиться этой записью" aria-label="Поделиться записью">📤 Поделиться</button>' +
+        '<div class="share-slot" data-id="' + r.id + '" data-share-text="' + esc(shareText) + '">' +
+          '<button type="button" class="action-btn btn-share-fallback" data-id="' + r.id + '" title="Поделиться этой записью" aria-label="Поделиться записью">📤 Поделиться</button>' +
         '</div>' +
       '</div>' +
     '</article>';
@@ -841,17 +852,6 @@
         showToast('Скопировано: ' + id);
         try { if (window.ym) window.ym(105817342, 'reachGoal', 'pif_copy_id'); } catch (e) {}
         try { if (window.gtag) window.gtag('event', 'copy_id', { id: id }); } catch (e) {}
-      });
-      return;
-    }
-
-    var btnCopy = ev.target.closest('.btn-copy-row');
-    if(btnCopy) {
-      var text = btnCopy.getAttribute('data-str');
-      navigator.clipboard.writeText(text).then(function(){
-        showToast('Строка скопирована');
-        try { if (window.ym) window.ym(105817342, 'reachGoal', 'pif_copy_row'); } catch (e) {}
-        try { if (window.gtag) window.gtag('event', 'copy_row'); } catch (e) {}
       });
       return;
     }
